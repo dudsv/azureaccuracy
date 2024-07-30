@@ -1,0 +1,132 @@
+Sub ContarPalavrasCSV()
+    Dim ws As Worksheet
+    Dim csvFile As String
+    Dim textLine As String
+    Dim bugCount As Long
+    Dim userStoryCount As Long
+    Dim fileNumber As Integer
+    Dim words As Variant
+    Dim i As Long
+    Dim userStoryPercentage As Double
+    Dim bugPercentage As Double
+    Dim percentageDiscounted As Double
+    Dim bugLines As String
+    Dim lineCounter As Long
+    Dim chartSheet As Worksheet
+    Dim chartObj As ChartObject
+    Dim resultsRange As Range
+    Dim bugPattern As String
+    
+    ' Defina o caminho para o arquivo CSV
+    csvFile = Application.GetOpenFilename("Arquivos CSV (*.csv), *.csv", , "Selecione o Arquivo CSV")
+    If csvFile = "False" Then Exit Sub ' Se o usuário cancelar, sair
+
+    ' Inicializar contadores e variáveis
+    bugCount = 0
+    userStoryCount = 0
+    bugLines = ""
+    lineCounter = 1
+    
+    ' Definir o padrão para identificar bugs
+    bugPattern = "Bug"
+    
+    ' Criar nova planilha para o gráfico e resultados
+    Set chartSheet = Worksheets.Add
+    chartSheet.Name = "Gráfico e Resultados"
+    
+    ' Abrir o arquivo CSV para leitura
+    fileNumber = FreeFile
+    Open csvFile For Input As #fileNumber
+
+    ' Ler cada linha do arquivo
+    Do While Not EOF(fileNumber)
+        Line Input #fileNumber, textLine
+        words = Split(textLine, ",")
+        
+        ' Procurar pelas palavras "Bug" e "User Story" em todas as colunas
+        For i = LBound(words) To UBound(words)
+            If InStr(1, words(i), "User Story", vbTextCompare) > 0 Then
+                userStoryCount = userStoryCount + 1
+            End If
+            If InStr(1, words(i), bugPattern, vbTextCompare) > 0 Then
+                ' Verificar se "Bug" está em um contexto a ser ignorado
+                If Not InStr(1, words(i), "Bugs to fix", vbTextCompare) > 0 Then
+                    bugCount = bugCount + 1
+                    bugLines = bugLines & "Linha " & lineCounter & ": " & textLine & vbCrLf
+                End If
+            End If
+        Next i
+        
+        lineCounter = lineCounter + 1
+    Loop
+
+    ' Fechar o arquivo
+    Close #fileNumber
+
+    ' Calcular a porcentagem de "User Story" como 100%
+    If userStoryCount > 0 Then
+        userStoryPercentage = 100
+    Else
+        userStoryPercentage = 0
+    End If
+
+    ' Calcular a porcentagem de "Bug" em relação ao total de "User Story"
+    If userStoryCount > 0 Then
+        bugPercentage = (bugCount / userStoryCount) * 100
+    Else
+        bugPercentage = 0
+    End If
+
+    ' Calcular a porcentagem descontada
+    percentageDiscounted = userStoryPercentage - bugPercentage
+
+    ' Criar gráfico
+    With chartSheet.ChartObjects.Add(Left:=100, Width:=375, Top:=50, Height:=225)
+        .Chart.ChartType = xlColumnClustered
+        .Chart.SetSourceData Source:=chartSheet.Range("A1:B2")
+        .Chart.SeriesCollection.NewSeries
+        .Chart.SeriesCollection(1).Name = "Contagem"
+        .Chart.SeriesCollection(1).XValues = Array("User Story", "Bug")
+        .Chart.SeriesCollection(1).Values = Array(userStoryPercentage, bugPercentage)
+        .Chart.HasTitle = True
+        .Chart.ChartTitle.Text = "Distribuição de User Story e Bug"
+    End With
+
+    ' Preencher os dados do gráfico na planilha
+    chartSheet.Range("A1").Value = "Tipo"
+    chartSheet.Range("B1").Value = "Porcentagem"
+    chartSheet.Range("A2").Value = "User Story"
+    chartSheet.Range("B2").Value = userStoryPercentage
+    chartSheet.Range("A3").Value = "Bug"
+    chartSheet.Range("B3").Value = bugPercentage
+
+    ' Criar a tabela com os resultados
+    Set resultsRange = chartSheet.Range("D1:E4")
+    resultsRange.Cells(1, 1).Value = "Descrição"
+    resultsRange.Cells(1, 2).Value = "Valor"
+    resultsRange.Cells(2, 1).Value = "Porcentagem de 'User Story'"
+    resultsRange.Cells(2, 2).Value = Format(userStoryPercentage, "0.00") & "%"
+    resultsRange.Cells(3, 1).Value = "Porcentagem de 'Bug'"
+    resultsRange.Cells(3, 2).Value = Format(bugPercentage, "0.00") & "%"
+    resultsRange.Cells(4, 1).Value = "Porcentagem descontada"
+    resultsRange.Cells(4, 2).Value = Format(percentageDiscounted, "0.00") & "%"
+
+    ' Aplicar formatação na tabela
+    With resultsRange
+        .Font.Bold = True
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).ColorIndex = 0
+        .Borders(xlEdgeBottom).TintAndShade = 0
+        .Borders(xlEdgeBottom).Weight = xlThin
+    End With
+
+    ' Exibir os resultados
+    MsgBox "Porcentagem de 'User Story': " & Format(userStoryPercentage, "0.00") & "%" & vbCrLf & _
+           "Porcentagem descontada de 'Bug': " & Format(percentageDiscounted, "0.00") & "%" & vbCrLf & vbCrLf & _
+           "Linhas contendo 'Bug':" & vbCrLf & bugLines, _
+           vbInformation, "Contagem de Palavras"
+End Sub
+
+
